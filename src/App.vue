@@ -1,28 +1,35 @@
 <template>
     <div id="app">
-        <el-input @keyup.enter.native="addTo()" placeholder="请输入内容" style="width: 500px;" v-model="input"></el-input>
+        <el-input @keyup.enter.native="insert()" placeholder="请输入内容" style="width: 400px;" v-model="input"></el-input>
+        <el-button @click="insert()">添加</el-button>
         <el-table
-            show-header="false"
-            :data="tableData.slice((currentPage-1)*pagesize,currentPage*pagesize).filter(data => !search || data.name.toLowerCase().includes(search.toLowerCase()))"
-            style="width: 500px;margin: 10px auto;"
+            :data="tableData.filter(data => !search || data.name.toLowerCase().includes(search.toLowerCase())).slice((currentPage-1)*pagesize,currentPage*pagesize)"
             highlight-current-row="true"
-           >
-            <el-table-column  type="selection">
+            show-header="false"
+            style="width: 500px;margin: 10px auto;"
+        >
+            <el-table-column type="selection">
+
             </el-table-column>
 
             <el-table-column
                 align="left">
-
+                <template slot="header">
+                    全选
+                </template>
                 <template slot-scope="scope">
+
                     <el-input
-                        v-focus
+                        @blur.prevent="modified(scope.row)"
+                        @keyup.enter.native="modified(scope.row)"
                         placeholder="输入修改的内容"
                         size="mini"
-                        v-model="scope.row.name"
+                        v-focus
                         v-if="scope.row.modified"
-                        @keyup.enter.native="modified(scope.row)"
+                        v-model="scope.row.name"
                     />
-                    <span v-else @click="modified(scope.row)">{{scope.row.name}}</span>
+
+                    <span @click="modified(scope.row)" v-else>{{scope.row.name}}</span>
                 </template>
             </el-table-column>
 
@@ -30,28 +37,32 @@
                 align="right">
                 <template slot="header">
                     <el-input
-                        v-model="search"
+                        placeholder="输入关键字搜索"
                         size="mini"
-                        placeholder="输入关键字搜索"/>
+                        v-model="search"/>
                 </template>
                 <template slot-scope="scope">
                     <el-button
+                        @click="modified(scope.row)"
+                        size="mini">编辑
+                    </el-button>
+                    <el-button
                         @click="remove(scope.$index)"
-                        icon="el-icon-close"
                         size="mini">
+                        删除
                     </el-button>
                 </template>
             </el-table-column>
 
         </el-table>
         <el-pagination
-            @size-change="handleSizeChange"
-            @current-change="handleCurrentChange"
             :current-page="currentPage"
-            :page-sizes="[5, 10, 20, 40]"
             :page-size="pagesize"
-            layout="total, sizes, prev, pager, next, jumper"
-            :total="tableData.length">
+            :page-sizes="[5, 10, 20, 40]"
+            :total="tableData.length"
+            @current-change="handleCurrentChange"
+            @size-change="handleSizeChange"
+            layout="total, sizes, prev, pager, next, jumper">
         </el-pagination>
     </div>
 </template>
@@ -61,53 +72,63 @@
         name: 'app',
         data() {
             return {
+                dataKey: 'todos',
                 input: '',
                 search: '',
-                tableData: [
-                    {
-                        modified: false,
-                        name: '吃饭'
-                    }, {
-                        modified: false,
-                        name: '睡觉'
-                    }, {
-                        modified: false,
-                        name: '喝水'
-                    }, {
-                        modified: false,
-                        name: '工作'
-                    }],
-                currentPage:1, //初始页
-                pagesize:5,    //    每页的数据
+                tableData: [],
+                currentPage: 1, //初始页
+                pagesize: 5,    //    每页的数据
             }
         },
         directives: {
             focus: {
                 inserted: function (el, bind, vnode) {
-                    console.log('-------------')
-                    console.log(vnode)
-                    console.log(vnode.elm.children[0])
-                    console.log('-------------')
-
+                    // console.log('-------------');
+                    // console.log(vnode);
+                    // console.log(vnode.elm.children[0]);
+                    // console.log('-------------');
                     vnode.elm.children[0].focus();
                 }
             }
         },
+        created: function () {
+            this.refresh();
+        },
         methods: {
-            addTo() {
+            append(data) {
+                let datas = this.$store.get(this.dataKey);
+                // console.log('this.$store.get(this.dataKey): ' +datas);
+                if ("undefined" == typeof datas || null == data ) {
+                    datas = [data];
+                } else {
+                    datas.push(data);
+                }
+                this.$store.set(this.dataKey, datas);
+            },
+            refresh() {
+                let todos = this.$store.get(this.dataKey);
+                if (null != todos) {
+                    this.tableData = todos;
+                }
+            },
+            insert() {
                 if (this.input == null || this.input.trim() == '') {
                     this.$message({
                         type: 'warning',
                         message: '无效的TODO'
                     });
                 } else {
-                    this.tableData.push({name: this.input});
+                    this.append({name: this.input, modified: false});
                     this.input = '';
+                    this.refresh();
                 }
 
             },
             remove(index) {
                 this.tableData.splice(index, 1);
+                // let move = JSON.stringify(this.$store.get(this.dataKey)[index])
+                // this.$store.remove('move')
+                // this.refresh();
             },
             modified(row) {
                 /**
@@ -122,8 +143,8 @@
                 console.log(row.modified);
                 const modified = row.modified;
 
-                this.tableData.forEach((item)=>{
-                    item.modified=false;
+                this.tableData.forEach((item) => {
+                    item.modified = false;
                 });
 
                 console.log(row.modified);
@@ -132,15 +153,16 @@
                 console.log(row.modified);
             },
             handleSizeChange(size) {
-                this.pageSize=size;
-               // console.log("长度改变:"+size)
+                this.pagesize = size;
+                console.log("长度改变:" + size)
             },
             handleCurrentChange(currentPage) {
-                this.currentPage=currentPage;
-               // console.log("当前改变："+currentPage);
-
+                this.currentPage = currentPage;
+                // console.log("当前改变："+currentPage);
             }
+
         }
+
     }
 </script>
 
